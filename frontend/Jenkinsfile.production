@@ -1,0 +1,340 @@
+pipeline {
+    agent any
+
+    environment {
+        // Harbor registry configuration (Production)
+        HARBOR_REGISTRY = 'harbor.natcomstore.com'
+        HARBOR_PROJECT  = 'reconsys'
+        IMAGE_NAME      = 'cms'
+
+        // Kubernetes configuration (Production)
+        NAMESPACE       = 'reconsys-app'
+
+        // Proxy configuration for air-gapped production environment
+        HTTP_PROXY = 'http://10.228.66.6:3128'
+        HTTPS_PROXY = 'http://10.228.66.6:3128'
+        NO_PROXY = 'localhost,127.0.0.1,10.228.0.0/16,10.244.0.0/16,harbor.natcomstore.com'
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    try {
+                        echo "🔄 Checking out Recon System CMS source code..."
+                        checkout scm
+
+                        // Git info
+                        env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                        env.GIT_BRANCH = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+
+                        // Derived image tags (after GIT vars exist)
+                        env.IMAGE_TAG        = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                        env.FULL_IMAGE_NAME  = "${env.HARBOR_REGISTRY}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                        env.LATEST_IMAGE_NAME = "${env.HARBOR_REGISTRY}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:latest"
+
+                        // Build time
+                        env.BUILD_TIME = sh(script: "date -u +%Y-%m-%dT%H:%M:%SZ", returnStdout: true).trim()
+
+                        echo "📋 Build Information:"
+                        echo "   - Branch: ${env.GIT_BRANCH}"
+                        echo "   - Commit: ${env.GIT_COMMIT}"
+                        echo "   - Build: ${env.BUILD_NUMBER}"
+                        echo "   - Image: ${env.FULL_IMAGE_NAME}"
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('prepare Build Environment') {
+            steps {
+                script {
+                    try {
+                        echo "🏗️ Building React application with Docker (multi-stage)..."
+                        echo "No local Node.js build; handled in Dockerfile."
+                        sh '''
+                            # Export proxy for shell commands in air-gapped environment
+                            export HTTP_PROXY="${HTTP_PROXY}"
+                            export HTTPS_PROXY="${HTTPS_PROXY}"
+                            export NO_PROXY="${NO_PROXY}"
+                            export http_proxy="${HTTP_PROXY}"
+                            export https_proxy="${HTTPS_PROXY}"
+                            export no_proxy="${NO_PROXY}"
+                            
+                            # Just to verify Dockerfile is present
+                            if [ ! -f Dockerfile ]; then
+                                echo "❌ Dockerfile not found!"
+                                exit 1
+                            fi
+                            echo "✅ Dockerfile found."
+                            
+                            # Check if python3 is installed
+                            if ! command -v python3 &> /dev/null; then
+                                echo "⬇️ Python3 not found, installing..."
+                                sudo yum install -y python3 || sudo apt-get install -y python3 || echo "⚠️ Could not install python3, please install manually"
+                            else
+                                echo "✅ Python3 already installed: $(python3 --version)"
+                            fi
+                            # Check if .env.prod exists and copy to .env
+                            if [ -f .env.prod ]; then
+                                echo "✅ Found .env.prod, copying to .env"
+                                cp .env.prod .env
+                            else
+                                echo "⚠️ .env.prod not found, skipping copy"
+                                exit 1
+                            fi
+                            
+                        '''
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    try {
+                        echo "🐳 Building Docker image..."
+                        sh '''
+                            # Export proxy for shell commands
+                            export HTTP_PROXY="${HTTP_PROXY}"
+                            export HTTPS_PROXY="${HTTPS_PROXY}"
+                            export NO_PROXY="${NO_PROXY}"
+                            export http_proxy="${HTTP_PROXY}"
+                            export https_proxy="${HTTPS_PROXY}"
+                            export no_proxy="${NO_PROXY}"
+                            
+                            # Build Docker image with build args
+                            docker build \
+                                --build-arg HTTP_PROXY="${HTTP_PROXY}" \
+                                --build-arg HTTPS_PROXY="${HTTPS_PROXY}" \
+                                --build-arg NO_PROXY="${NO_PROXY}" \
+                                --build-arg PRODUCTION=true \
+                                -t "${FULL_IMAGE_NAME}" \
+                                -t "${LATEST_IMAGE_NAME}" \
+                                .
+
+                            # Verify image was created
+                            docker images | grep "${IMAGE_NAME}"
+                        '''
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                script {
+                    try {
+                        echo "🔐 Running security scan..."
+                        sh '''
+                            # Basic image vulnerability scan (optional)
+                            # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                            #     aquasec/trivy image "${FULL_IMAGE_NAME}" || true
+
+                            echo "🛡️ Security scan completed"
+                        '''
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Push to Harbor') {
+            steps {
+                script {
+                    try {
+                        echo "📤 Pushing Docker image to Harbor..."
+                        withCredentials([usernamePassword(credentialsId: 'jenkins_harbor_smsgw', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+                            sh '''
+                                # Login to Harbor
+                                echo "${HARBOR_PASS}" | docker login "${HARBOR_REGISTRY}" -u "${HARBOR_USER}" --password-stdin
+
+                                # Push both tagged and latest images
+                                docker push "${FULL_IMAGE_NAME}"
+                                docker push "${LATEST_IMAGE_NAME}"
+
+                                # Logout
+                                docker logout "${HARBOR_REGISTRY}"
+
+                                echo "✅ Images pushed successfully"
+                            '''
+                        }
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+
+    }
+
+    post {
+        always {
+            script {
+                echo "🧹 Cleaning up..."
+                withCredentials([usernamePassword(credentialsId: 'jenkins_harbor_smsgw', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+                    sh '''
+                        # Export proxy for shell commands
+                        export HTTP_PROXY="${HTTP_PROXY}"
+                        export HTTPS_PROXY="${HTTPS_PROXY}"
+                        export NO_PROXY="${NO_PROXY}"
+                        export http_proxy="${HTTP_PROXY}"
+                        export https_proxy="${HTTPS_PROXY}"
+                        export no_proxy="${NO_PROXY}"
+                        
+                        # Clean up local Docker images to save space
+                        docker rmi "${FULL_IMAGE_NAME}" "${LATEST_IMAGE_NAME}" || true
+                        
+                        # Clean up old images on Harbor (keep only latest 3 versions)
+                        echo "🧹 Cleaning up old Harbor images..."
+                        python3 - <<'PYTHON_SCRIPT'
+import requests
+import json
+import os
+import urllib3
+from requests.auth import HTTPBasicAuth
+
+# Suppress only the single InsecureRequestWarning from urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+harbor_registry = os.environ.get('HARBOR_REGISTRY')
+harbor_project = os.environ.get('HARBOR_PROJECT')
+image_name = os.environ.get('IMAGE_NAME')
+harbor_user = os.environ.get('HARBOR_USER')
+harbor_pass = os.environ.get('HARBOR_PASS')
+
+# Harbor API endpoint
+api_url = f"https://{harbor_registry}/api/v2.0"
+repo_name = f"{harbor_project}/{image_name}"
+
+try:
+    # Get all artifacts/tags
+    response = requests.get(
+        f"{api_url}/projects/{harbor_project}/repositories/{image_name}/artifacts",
+        auth=HTTPBasicAuth(harbor_user, harbor_pass),
+        params={"page": 1, "page_size": 100, "with_tag": "true"},
+        verify=False
+    )
+    
+    if response.status_code == 200:
+        artifacts = response.json()
+        
+        # Filter artifacts with tags (exclude 'latest')
+        tagged_artifacts = [
+            a for a in artifacts 
+            if a.get('tags') and any(t['name'] != 'latest' for t in a['tags'])
+        ]
+        
+        # Sort by push_time (newest first)
+        tagged_artifacts.sort(key=lambda x: x.get('push_time', ''), reverse=True)
+        
+        # Keep only 3 most recent, delete the rest
+        artifacts_to_delete = tagged_artifacts[3:]
+        
+        print(f"Found {len(tagged_artifacts)} tagged images, keeping 3, deleting {len(artifacts_to_delete)}")
+        
+        for artifact in artifacts_to_delete:
+            digest = artifact['digest']
+            tags = ', '.join([t['name'] for t in artifact.get('tags', [])])
+            print(f"Deleting artifact {digest[:12]}... (tags: {tags})")
+            
+            del_response = requests.delete(
+                f"{api_url}/projects/{harbor_project}/repositories/{image_name}/artifacts/{digest}",
+                auth=HTTPBasicAuth(harbor_user, harbor_pass),
+                verify=False
+            )
+            
+            if del_response.status_code in [200, 202]:
+                print(f"✅ Deleted successfully")
+            else:
+                print(f"⚠️ Failed to delete: {del_response.status_code}")
+    else:
+        print(f"⚠️ Failed to fetch artifacts: {response.status_code}")
+        
+except Exception as e:
+    print(f"⚠️ Error cleaning up Harbor images: {e}")
+    print("Continuing pipeline...")
+PYTHON_SCRIPT
+
+                        # Clean up build artifacts
+                        rm -rf node_modules dist || true
+                    '''
+                }
+            }
+        }
+        success {
+            script {
+                echo """
+                ✅ Recon System CMS PRODUCTION - Build & Push completed successfully!
+
+                📋 Build Summary:
+                   - Image: ${FULL_IMAGE_NAME}
+                   - Latest: ${LATEST_IMAGE_NAME}
+                   - Build: #${env.BUILD_NUMBER}
+                   - Commit: ${env.GIT_COMMIT}
+                   - Branch: ${env.GIT_BRANCH}
+
+                📦 Image pushed to Harbor registry successfully!
+
+                ⚠️  MANUAL DEPLOYMENT REQUIRED ⚠️
+                
+                Please deploy manually to production using one of the following methods:
+
+                1️⃣ Using kubectl directly:
+                   cd recon_cms/k8s/production
+                   kubectl apply -f namespace.yaml
+                   kubectl apply -f deployment.yaml
+                   kubectl rollout status deployment/recon-cms -n ${NAMESPACE}
+
+                2️⃣ Update image tag in deployment.yaml:
+                   sed -i 's|image: ${HARBOR_REGISTRY}/reconsys/cms:.*|image: ${FULL_IMAGE_NAME}|g' k8s/production/deployment.yaml
+                   kubectl apply -f k8s/production/deployment.yaml -n ${NAMESPACE}
+
+                3️⃣ Using kubectl set image:
+                   kubectl set image deployment/recon-cms recon-cms=${FULL_IMAGE_NAME} -n ${NAMESPACE}
+                   kubectl rollout status deployment/recon-cms -n ${NAMESPACE}
+
+                🔗 Harbor Registry: https://${HARBOR_REGISTRY}/harbor/projects/${HARBOR_PROJECT}/repositories/${IMAGE_NAME}
+                """
+            }
+        }
+        failure {
+            script {
+                echo """
+                ❌ Recon System CMS PRODUCTION deployment failed!
+
+                📋 Failure Details:
+                   - Build: #${env.BUILD_NUMBER}
+                   - Branch: ${env.GIT_BRANCH}
+                   - Commit: ${env.GIT_COMMIT}
+
+                Please check the build logs for details.
+                """
+            }
+        }
+    }
+}

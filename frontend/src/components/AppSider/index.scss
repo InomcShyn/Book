@@ -1,0 +1,18 @@
+.ant-menu-submenu-popup > .ant-menu {
+  background-color: #1c2536 !important;
+  .ant-menu-item-selected {
+    background-color: #ffffff0a !important;
+    &::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      right: 8px;
+      width: 7px;
+      height: 7px;
+      background-color: #57f800;
+      box-shadow: 0 0 5px #57f800;
+      border-radius: 99px;
+    }
+  }
+}

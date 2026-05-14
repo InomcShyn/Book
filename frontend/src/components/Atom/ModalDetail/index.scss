@@ -1,0 +1,35 @@
+.gt-modal--center-title .ant-modal-header {
+  display: flex;
+  justify-content: center;
+}
+
+.gt-modal--center-title .ant-modal-title {
+  text-align: center;
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .ant-modal {
+    width: 90% !important;
+  }
+}
+
+// .gt-modal {
+//   .ant-modal-content {
+//     padding: 0 0 10px;
+//     border-radius: 16px;
+//   }
+//   .ant-modal-header {
+//     background-color: #1570ef;
+//     padding: 16px 20px;
+//     border-radius: 16px 16px 0 0;
+//   }
+
+//   .ant-modal-title {
+//     color: white;
+//   }
+// }
+
+.ant-modal .ant-modal-close-x {
+  color: white;
+}

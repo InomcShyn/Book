@@ -1,0 +1,6 @@
+:where(
+    .css-dev-only-do-not-override-l9pxc0
+  ).ant-textarea-outlined.ant-textarea-disabled,
+:where(.css-dev-only-do-not-override-l9pxc0).ant-textarea-outlined[disabled] {
+  color: black;
+}

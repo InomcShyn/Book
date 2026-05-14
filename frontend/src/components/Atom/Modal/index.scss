@@ -1,0 +1,53 @@
+.gt-modal.ant-modal {
+  .ant-modal-close {
+    .ant-modal-close-x {
+      color: white;
+    }
+  }
+}
+
+.gt-modal {
+  .ant-modal-content {
+    padding: 0 0 10px;
+    border-radius: 16px;
+    max-height: 90vh;
+  }
+  .ant-modal-header {
+    background-color: #ffa000;
+    padding: 10px 20px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .ant-modal-title {
+    color: white;
+  }
+  .ant-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 60vh; // phần thân cuộn, giữ lại phần footer
+    padding-right: 16px; // tránh đè lên scroll bar
+  }
+}
+
+.ant-modal .ant-modal-body {
+  padding: 0 20px;
+}
+
+:where(.css-dev-only-do-not-override-l9pxc0).ant-modal .ant-modal-close {
+  top: 6px;
+}
+
+.container-table .ant-pagination-options .ant-select {
+  width: fit-content !important;
+}
+
+@media (max-width: 1200px) {
+  .ant-modal {
+    width: 60% !important;
+  }
+}
+@media (max-width: 768px) {
+  .ant-modal {
+    width: 90% !important;
+  }
+}

@@ -1,0 +1,56 @@
+.breadcrumb-clickable {
+  cursor: pointer;
+  height: inherit !important;
+}
+
+.breadcrumb-not-clickable {
+  pointer-events: none;
+  color: var(--text-secondary);
+}
+
+.breadcrumb-last {
+  & > .breadcrumb-label {
+    color: #686868;
+    font-weight: 600;
+  }
+}
+
+.ant-breadcrumb li:last-child .breadcrumb-label {
+  font-weight: 500;
+}
+
+.breadcrumb-label {
+  color: #9da4ae;
+  font-weight: normal;
+  font-size: 14px;
+
+  @media (min-width: 480px) {
+    font-size: 16px;
+  }
+
+  @media (min-width: 768px) {
+    font-size: 22px;
+  }
+}
+
+.app-breadcrumb {
+  .ant-breadcrumb-separator {
+    color: #9da4ae;
+    font-weight: normal;
+    font-size: 14px;
+
+    @media (min-width: 480px) {
+      font-size: 16px;
+    }
+
+    @media (min-width: 768px) {
+      font-size: 24px;
+    }
+  }
+
+  .breadcrumb-last {
+    .breadcrumb-label {
+      color: black;
+    }
+  }
+}

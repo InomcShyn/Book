@@ -1,0 +1,33 @@
+.ant-btn-color-primary{
+    box-shadow: none;
+}
+
+.upload-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  @media (min-width: 576px) {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.upload-note {
+  font-size: 12px;
+  color: #888;
+}
+
+.upload-button {
+  color: blue;
+  background-color: white;
+  border-color: white;
+  max-width: 100px;
+  width: 100%;
+
+  @media (min-width: 576px) {
+    width: fit-content;
+    
+  }
+}

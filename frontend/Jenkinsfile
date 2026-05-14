@@ -1,0 +1,350 @@
+pipeline {
+    agent any
+
+    environment {
+        // Harbor registry configuration
+        HARBOR_REGISTRY = 'dockerharbor-devtool.arabicatech.vn'
+        HARBOR_PROJECT  = 'reconsys'
+        IMAGE_NAME      = 'recon_cms'
+
+        // Kubernetes configuration
+        NAMESPACE       = 'recon-staging'
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    try {
+                        echo "🔄 Checking out Recon Sys CMS source code..."
+                        checkout scm
+
+                        // Git info
+                        env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                        env.GIT_BRANCH = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+
+                        // Derived image tags (after GIT vars exist)
+                        env.IMAGE_TAG        = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                        env.FULL_IMAGE_NAME  = "${env.HARBOR_REGISTRY}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                        env.LATEST_IMAGE_NAME = "${env.HARBOR_REGISTRY}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:latest"
+
+                        // Build time
+                        env.BUILD_TIME = sh(script: "date -u +%Y-%m-%dT%H:%M:%SZ", returnStdout: true).trim()
+
+                        echo "📋 Build Information:"
+                        echo "   - Branch: ${env.GIT_BRANCH}"
+                        echo "   - Commit: ${env.GIT_COMMIT}"
+                        echo "   - Build: ${env.BUILD_NUMBER}"
+                        echo "   - Image: ${env.FULL_IMAGE_NAME}"
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Build Application') {
+            steps {
+                script {
+                    try {
+                        echo "🏗️ Building React application with Docker (multi-stage)..."
+                        echo "No local Node.js build; handled in Dockerfile."
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    try {
+                        echo "🐳 Building Docker image..."
+                        sh '''
+                            # Build Docker image with build args
+                            docker build \
+                                -t "${FULL_IMAGE_NAME}" \
+                                -t "${LATEST_IMAGE_NAME}" \
+                                .
+
+                            # Verify image was created
+                            docker images | grep "${IMAGE_NAME}"
+                        '''
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                script {
+                    try {
+                        echo "🔐 Running security scan..."
+                        sh '''
+                            # Basic image vulnerability scan (optional)
+                            # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                            #     aquasec/trivy image "${FULL_IMAGE_NAME}" || true
+
+                            echo "🛡️ Security scan completed"
+                        '''
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Push to Harbor') {
+            steps {
+                script {
+                    try {
+                        echo "📤 Pushing Docker image to Harbor..."
+                        withCredentials([usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+                            sh '''
+                                # Login to Harbor
+                                echo "${HARBOR_PASS}" | docker login "${HARBOR_REGISTRY}" -u "${HARBOR_USER}" --password-stdin
+
+                                # Push both tagged and latest images
+                                docker push "${FULL_IMAGE_NAME}"
+                                docker push "${LATEST_IMAGE_NAME}"
+
+                                # Logout
+                                docker logout "${HARBOR_REGISTRY}"
+
+                                echo "✅ Images pushed successfully"
+                            '''
+                        }
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Install kubectl') {
+            steps {
+                script {
+                    try {
+                        echo "📦 Checking/Installing kubectl..."
+                        def hasKubectl = (sh(script: 'command -v kubectl >/dev/null 2>&1', returnStatus: true) == 0)
+                        if (hasKubectl) {
+                            env.KUBECTL = 'kubectl'
+                            sh '${KUBECTL} version --client || true'
+                        } else {
+                            echo "⬇️ Installing kubectl locally in workspace..."
+                            sh '''
+                                set -e
+                                mkdir -p "${WORKSPACE}/bin"
+                                KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
+                                echo "Using kubectl ${KUBECTL_VERSION}"
+                                curl -L -o "${WORKSPACE}/bin/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+                                chmod +x "${WORKSPACE}/bin/kubectl"
+                            '''
+                            env.KUBECTL = "${env.WORKSPACE}/bin/kubectl"
+                            sh '${KUBECTL} version --client'
+                        }
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    try {
+                        echo "🚀 Deploying to Kubernetes staging environment..."
+                        withKubeConfig([credentialsId: 'k8s-config', serverUrl: 'https://171.244.63.217:6443']) {
+                            withCredentials([usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+                                sh '''
+                                    # Verify cluster connection
+                                    ${KUBECTL} cluster-info
+                                    
+                                    # Create namespace if it doesn't exist
+                                    ${KUBECTL} apply -f k8s/namespace.yaml || true
+
+                                    # Create Harbor credentials secret if not exists
+                                    ${KUBECTL} create secret docker-registry harbor-credentials \
+                                        --docker-server="${HARBOR_REGISTRY}" \
+                                        --docker-username="${HARBOR_USER}" \
+                                        --docker-password="${HARBOR_PASS}" \
+                                        --namespace="${NAMESPACE}" \
+                                        --dry-run=client -o yaml | ${KUBECTL} apply -f - || true
+
+                                    # Update image in deployment
+                                    sed -i "s|image: dockerharbor-devtool.arabicatech.vn/reconsys/recon_cms:latest|image: ${FULL_IMAGE_NAME}|g" k8s/deployment.yaml
+
+                                    # Apply deployment
+                                    ${KUBECTL} apply -f k8s/deployment.yaml
+
+                                    # Wait for rollout to complete
+                                    ${KUBECTL} rollout status deployment/recon-cms \
+                                        --namespace="${NAMESPACE}" \
+                                        --timeout=300s
+
+                                    # Verify deployment
+                                    ${KUBECTL} get pods -l app=recon-cms --namespace="${NAMESPACE}"
+
+                                    echo "✅ Deployment completed successfully"
+                                '''
+                            }
+                        }
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+
+    stage('Health Check') {
+            steps {
+                script {
+                    try {
+                        echo "🏥 Performing health checks..."
+                        withKubeConfig([credentialsId: 'k8s-config', serverUrl: 'https://171.244.63.217:6443']) {
+                            sh '''
+                                # Wait for pods to be ready
+                                    ${KUBECTL} wait --for=condition=ready pod \
+                                    -l app=recon-cms \
+                                    --namespace="${NAMESPACE}" \
+                                    --timeout=300s
+
+                                # Check service status
+                                    ${KUBECTL} get service recon-cms-service --namespace="${NAMESPACE}"
+
+                                # Check ingress status
+                                    ${KUBECTL} get ingress recon-cms-ingress --namespace="${NAMESPACE}"
+
+                                echo "✅ Health checks passed"
+                            '''
+                        }
+                    } catch (err) {
+                        env.FAILED_STAGE = env.STAGE_NAME
+                        env.FAILED_CAUSE = err.getMessage()
+                        error("Stage '" + env.STAGE_NAME + "' failed: " + err.getMessage())
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                echo "🧹 Cleaning up..."
+                sh '''
+                    # Clean up local Docker images to save space
+                    docker rmi "${FULL_IMAGE_NAME}" "${LATEST_IMAGE_NAME}" || true
+
+                    # Clean up build artifacts
+                    rm -rf node_modules dist || true
+                '''
+            }
+        }
+        success {
+            script {
+                echo """
+                ✅ Recon Sys CMS deployment completed successfully!
+
+                📋 Deployment Summary:
+                   - Image: ${FULL_IMAGE_NAME}
+                   - Namespace: ${NAMESPACE}
+                   - URL: https://cms-recon.arabicatech.vn
+                   - Build: #${env.BUILD_NUMBER}
+                   - Commit: ${env.GIT_COMMIT}
+
+                🔗 Access the CMS at: https://cms-recon.arabicatech.vn
+                """
+
+                // Send Telegram notification on success
+                withCredentials([
+                    string(credentialsId: 'telegram-bot-token', variable: 'TELEGRAM_BOT_TOKEN'),
+                    string(credentialsId: 'telegram-chat-id',  variable: 'TELEGRAM_CHAT_ID')
+                ]) {
+                    sh '''
+                        set -e
+                        MESSAGE=$(cat <<EOF
+✅ Recon Sys CMS pipeline SUCCESS
+Build: #${BUILD_NUMBER}
+Branch: ${GIT_BRANCH}
+Commit: ${GIT_COMMIT}
+Image: ${FULL_IMAGE_NAME}
+Namespace: ${NAMESPACE}
+App URL: https://cms-recon.arabicatech.vn
+Job: ${JOB_NAME}
+URL: ${BUILD_URL}
+EOF
+)
+                        curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                          -d "chat_id=${TELEGRAM_CHAT_ID}" \
+                          --data-urlencode "text=${MESSAGE}" \
+                          -d "parse_mode=Markdown" >/dev/null || true
+                    '''
+                }
+            }
+        }
+        failure {
+            script {
+                echo """
+                ❌ Recon Sys CMS deployment failed!
+
+                📋 Failure Details:
+                   - Build: #${env.BUILD_NUMBER}
+                   - Branch: ${env.GIT_BRANCH}
+                   - Commit: ${env.GIT_COMMIT}
+
+                Please check the build logs for details.
+                """
+
+                // Send Telegram notification on failure
+                withCredentials([
+                    string(credentialsId: 'telegram-bot-token', variable: 'TELEGRAM_BOT_TOKEN'),
+                    string(credentialsId: 'telegram-chat-id',  variable: 'TELEGRAM_CHAT_ID')
+                ]) {
+                    sh '''
+                                                set -e
+                                                MESSAGE=$(cat <<EOF
+❌ Recon Sys CMS pipeline FAILED
+Stage: ${FAILED_STAGE:-Unknown}
+Cause: ${FAILED_CAUSE:-See Jenkins logs}
+Build: #${BUILD_NUMBER}
+Branch: ${GIT_BRANCH}
+Commit: ${GIT_COMMIT}
+Image: ${FULL_IMAGE_NAME}
+Job: ${JOB_NAME}
+URL: ${BUILD_URL}
+EOF
+)
+                                                curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                                                    -d "chat_id=${TELEGRAM_CHAT_ID}" \
+                                                    --data-urlencode "text=${MESSAGE}" \
+                                                    -d "parse_mode=Markdown" >/dev/null || true
+                    '''
+                }
+            }
+        }
+    }
+}

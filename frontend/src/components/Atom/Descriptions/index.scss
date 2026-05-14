@@ -1,0 +1,42 @@
+:where(
+    .css-dev-only-do-not-override-l9pxc0
+  ).ant-descriptions.ant-descriptions-bordered
+  > .ant-descriptions-view
+  .ant-descriptions-row
+  > .ant-descriptions-item-label {
+  color: black;
+  background-color: white;
+  font-weight: 500;
+}
+
+.gt-description .ant-descriptions-view {
+  border: none !important;
+}
+
+.gt-description .ant-descriptions-item-label,
+.gt-description .ant-descriptions-item-content {
+  border: none !important;
+}
+
+.gt-description .ant-descriptions-row {
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.ant-descriptions-item-label {
+  width: 33.33% !important; // 1/3 chiều rộng column
+  max-width: 33.33%;
+  flex: none;
+  font-weight: 500;
+}
+
+.ant-descriptions-item-content {
+  width: 66.66% !important; // 2/3 còn lại
+  max-width: 66.66%;
+  flex: none;
+}
+
+.gt-description {
+  .custom-height-row {
+    height: 150px;
+  }
+}

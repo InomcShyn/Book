@@ -1,0 +1,9 @@
+@media (max-width: 768px) {
+  .ant-picker-panels {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  .ant-picker-panels > * {
+    width: 100% !important;
+  }
+}

@@ -1,0 +1,33 @@
+.text-connect-success {
+  color: green;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.text-connect-failed {
+  color: red;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.text-connect-loadding {
+  color: #1890ff;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.button-connect {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1890ff;
+  text-decoration: underline;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+:where(.css-dev-only-do-not-override-l9pxc0).ant-picker
+  .ant-picker-input
+  > input[disabled] {
+  color: black;
+}

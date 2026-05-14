@@ -1,0 +1,6 @@
+:where(
+    .css-dev-only-do-not-override-l9pxc0
+  ).ant-input-outlined.ant-input-disabled,
+:where(.css-dev-only-do-not-override-l9pxc0).ant-input-outlined[disabled] {
+  color: black;
+}

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reconsys-app
+  labels:
+    name: reconsys-app
+    project: reconsys
+    environment: production

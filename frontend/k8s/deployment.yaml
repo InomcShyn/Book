@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recon-cms
+  namespace: recon-staging
+  labels:
+    app: recon-cms
+    environment: staging
+    version: "2.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recon-cms
+      environment: staging
+  template:
+    metadata:
+      labels:
+        app: recon-cms
+        environment: staging
+        version: "2.0"
+    spec:
+      containers:
+      - name: recon-cms
+        image: dockerharbor-devtool.arabicatech.vn/reconsys/recon_cms:latest
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "staging"
+        - name: VERSION
+          value: "2.0"
+        - name: BUILD_TIME
+          value: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+      restartPolicy: Always
+      imagePullSecrets:
+      - name: harbor-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recon-cms-node-port
+  namespace: recon-staging
+  labels:
+    app: recon-cms
+    environment: staging
+    version: "2.0"
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+    nodePort: 30180
+  selector:
+    app: recon-cms
+    environment: staging
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: recon-cms-service
+#   namespace: recon-staging
+#   labels:
+#     app: recon-cms
+#     environment: staging
+# spec:
+#   type: ClusterIP
+#   ports:
+#   - port: 80
+#     targetPort: 80
+#     protocol: TCP
+#     name: http
+#   selector:
+#     app: recon-cms
+#     environment: staging
+
+---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: recon-cms-ingress
+#   namespace: recon-staging
+#   labels:
+#     app: recon-cms
+#     environment: staging
+#   annotations:
+#     kubernetes.io/ingress.class: nginx
+#     cert-manager.io/cluster-issuer: letsencrypt-prod
+#     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+#     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+#     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+#     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+#     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+# spec:
+#   tls:
+#   - hosts:
+#     - cms-recon.arabicatech.vn
+#     secretName: recon-cms-tls
+#   rules:
+#   - host: cms-recon.arabicatech.vn
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: recon-cms-service
+#             port:
+#               number: 80

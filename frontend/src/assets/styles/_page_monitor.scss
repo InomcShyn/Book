@@ -1,0 +1,7 @@
+.container-monitor {
+    .container-monitor__form{
+        display: grid;
+        grid-template-columns: calc(100% - 205px) 205px;
+        justify-content: space-between;
+    }
+}

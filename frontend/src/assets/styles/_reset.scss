@@ -1,0 +1,61 @@
+/* Reset Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+
+}
+
+html,
+body {
+  height: 100%;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+.ant-select-clear {
+  right: 30px !important ;
+  top: 13px !important;
+}
+
+.ant-form-item {
+  margin-bottom: 10px;
+}
+
+.container-table .ant-table-pagination {
+  display: flex !important;
+  justify-content: center;
+}
+
+.gt-label {
+  font-weight: 550;
+}
+
+.ant-table-wrapper .ant-table-cell{
+ padding:  16px 16px !important;
+}
