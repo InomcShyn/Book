@@ -1,5 +1,5 @@
-import { bookApi } from "@/api/book.api";
-import { categoryApi } from "@/api/category.api";
+import { bookApi } from "@/api/book.api.ts";
+import { categoryApi } from "@/api/category.api.ts";
 import { ActionMenu } from "@/components/Atom/ActionMenu";
 import { Button } from "@/components/Atom/Button";
 import CommonActionIcon from "@/components/Atom/CommonActionIcon";
@@ -140,47 +140,31 @@ function Book() {
 
   const loadCategories = async () => {
     try {
-      const response = await categoryApi.getAll();
-      const catsData = response?.data || response || [];
-      console.log('📁 Categories Response:', response);
-      console.log('📁 Categories Data:', catsData);
-      setCategories(catsData);
-      console.log('✅ Categories loaded successfully:', catsData.length, 'items');
+      const categories = await categoryApi.getAll();
+      setCategories(categories);
     } catch (error) {
       console.error('❌ Error loading categories:', error);
     }
   };
 
   const onSearch = async (value) => {
-    const dataSearch = {
-      ...query,
-      ...value,
-    };
     try {
       setLoading(true);
-      const response = await bookApi.getAll();
-      const booksData = response?.data || response || [];
+      const books = await bookApi.getAll();
 
-      console.log('📚 Books Response:', response);
-      console.log('📚 Books Data:', booksData);
-
-      if (response.code === "00" || Array.isArray(booksData)) {
-        if (booksData.length === 0 && query.page > 0) {
-          setQuery((prev) => ({ ...prev, page: query.page - 1 }));
-          return;
-        }
-        // Format data for pagination
-        const formattedData = {
-          data: booksData,
-          pagination: {
-            totalRecords: booksData.length,
-          },
-        };
-        setDataTable(formattedData);
-        console.log('✅ Books loaded successfully:', booksData.length, 'items');
-      } else {
-        toast.error(response?.message || t("toast.error"));
+      if (books.length === 0 && query.page > 0) {
+        setQuery((prev) => ({ ...prev, page: query.page - 1 }));
+        return;
       }
+      
+      // Format data for pagination
+      const formattedData = {
+        data: books,
+        pagination: {
+          totalRecords: books.length,
+        },
+      };
+      setDataTable(formattedData);
     } catch (error) {
       console.error('❌ Error loading books:', error);
       toast.error(t(MessageError));
@@ -258,15 +242,16 @@ function Book() {
 
   const onGetDetail = async (id) => {
     try {
-      const allBooks = await bookApi.getAll();
-      const booksData = allBooks?.data || allBooks || [];
-      const book = booksData.find((b) => b._id === id);
+      const books = await bookApi.getAll();
+      const book = books.find((b) => b._id === id);
+      
       if (book) {
         setValueForms(book);
       } else {
         toast.error(t(MessageError));
       }
     } catch (error) {
+      console.error('❌ Error loading book detail:', error);
       toast.error(t(MessageError));
     }
   };

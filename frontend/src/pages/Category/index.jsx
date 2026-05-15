@@ -1,4 +1,4 @@
-import { categoryApi } from "@/api/category.api";
+import { categoryApi } from "@/api/category.api.ts";
 import { getCategoryStatus } from "@/assets/data/categoryData";
 import { ActionMenu } from "@/components/Atom/ActionMenu";
 import { Button } from "@/components/Atom/Button";
@@ -116,35 +116,23 @@ function Category() {
   ];
 
   const onSearch = async (value) => {
-    const dataSearch = {
-      ...query,
-      ...value,
-    };
     try {
       setLoading(true);
-      const response = await categoryApi.getAll();
-      const catsData = response?.data || response || [];
+      const categories = await categoryApi.getAll();
 
-      console.log('📁 Categories Response:', response);
-      console.log('📁 Categories Data:', catsData);
-
-      if (response.code === "00" || Array.isArray(catsData)) {
-        if (catsData.length === 0 && query.page > 0) {
-          setQuery((prev) => ({ ...prev, page: query.page - 1 }));
-          return;
-        }
-        // Format data for pagination
-        const formattedData = {
-          data: catsData,
-          pagination: {
-            totalRecords: catsData.length,
-          },
-        };
-        setDataTable(formattedData);
-        console.log('✅ Categories loaded successfully:', catsData.length, 'items');
-      } else {
-        toast.error(response?.message || t("toast.error"));
+      if (categories.length === 0 && query.page > 0) {
+        setQuery((prev) => ({ ...prev, page: query.page - 1 }));
+        return;
       }
+      
+      // Format data for pagination
+      const formattedData = {
+        data: categories,
+        pagination: {
+          totalRecords: categories.length,
+        },
+      };
+      setDataTable(formattedData);
     } catch (error) {
       console.error('❌ Error loading categories:', error);
       toast.error(t(MessageError));
@@ -182,15 +170,16 @@ function Category() {
 
   const onGetDetail = async (id) => {
     try {
-      const allCategories = await categoryApi.getAll();
-      const catsData = allCategories?.data || allCategories || [];
-      const category = catsData.find((c) => c._id === id);
+      const categories = await categoryApi.getAll();
+      const category = categories.find((c) => c._id === id);
+      
       if (category) {
         setValueForms(category);
       } else {
         toast.error(t(MessageError));
       }
     } catch (error) {
+      console.error('❌ Error loading category detail:', error);
       toast.error(t(MessageError));
     }
   };
