@@ -69,12 +69,18 @@ export const bookApi = {
     try {
       const response = await getDataApi<GetBooksResponse>("books", params);
       
+      // Kiểm tra response tồn tại
+      if (!response) {
+        console.warn("⚠️ Empty response from getAll books");
+        return [];
+      }
+      
       // Xử lý response có thể có nhiều format khác nhau
       if (Array.isArray(response)) {
         return response as unknown as IBook[];
       }
       
-      if (response.data && Array.isArray(response.data)) {
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
         return response.data;
       }
       
@@ -82,7 +88,8 @@ export const bookApi = {
       return [];
     } catch (error) {
       console.error("❌ Error fetching books:", error);
-      throw error;
+      // Return empty array thay vì throw để không crash UI
+      return [];
     }
   },
 
@@ -101,7 +108,11 @@ export const bookApi = {
       const url = populate ? `books/${id}?populate=category` : `books/${id}`;
       const response = await getDataApi<GetBookResponse>(url);
       
-      if (response.data) {
+      if (!response) {
+        throw new Error(`No response from server when fetching book ${id}`);
+      }
+      
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
         return response.data;
       }
       
@@ -134,7 +145,11 @@ export const bookApi = {
         data
       );
       
-      if (response.data) {
+      if (!response) {
+        throw new Error('No response from server when creating book');
+      }
+      
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
         console.log("✅ Book created successfully:", response.data);
         return response.data;
       }
@@ -166,7 +181,11 @@ export const bookApi = {
         data
       );
       
-      if (response.data) {
+      if (!response) {
+        throw new Error(`No response from server when updating book ${id}`);
+      }
+      
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
         console.log("✅ Book updated successfully:", response.data);
         return response.data;
       }

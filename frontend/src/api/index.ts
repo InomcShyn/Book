@@ -103,7 +103,7 @@ const debounceApiCall = <T>(
  * @param url - API endpoint
  * @param params - Query parameters
  * @returns Promise với dữ liệu kiểu T
- * 
+ *
  * @example
  * const books = await getDataApi<IBook[]>('books');
  * const book = await getDataApi<IBook>('books/123');
@@ -113,7 +113,7 @@ export const getDataApi = async <T = unknown>(
   params: ApiParams = {}
 ): Promise<T> => {
   const key = createKey("GET", url, params);
-  
+
   try {
     // GET requests không cần debounce mạnh, chỉ cần prevent duplicate
     return await debounceApiCall<T>(
@@ -132,7 +132,7 @@ export const getDataApi = async <T = unknown>(
  * @param url - API endpoint
  * @param params - Query parameters
  * @returns Promise với Blob data
- * 
+ *
  * @example
  * const blob = await exportBlobApi('books/export', { format: 'xlsx' });
  */
@@ -141,7 +141,7 @@ export const exportBlobApi = async (
   params: ApiParams = {}
 ): Promise<Blob> => {
   const key = createKey("GET", url, params);
-  
+
   try {
     return await debounceApiCall<Blob>(
       key,
@@ -164,7 +164,7 @@ export const exportBlobApi = async (
  * @param url - API endpoint
  * @param body - Request body data
  * @returns Promise với dữ liệu kiểu T
- * 
+ *
  * @example
  * const newBook = await postDataApi<IBook, CreateBookDto>('books', bookData);
  */
@@ -173,7 +173,7 @@ export const postDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
   body: D
 ): Promise<T> => {
   const key = createKey("POST", url, body);
-  
+
   try {
     // POST cần debounce để tránh double submit
     return await debounceApiCall<T>(
@@ -194,7 +194,7 @@ export const postDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
  * @param url - API endpoint
  * @param body - Request body data
  * @returns Promise với dữ liệu kiểu T
- * 
+ *
  * @example
  * const updatedBook = await putDataApi<IBook, UpdateBookDto>('books/123', updateData);
  */
@@ -203,7 +203,7 @@ export const putDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
   body: D
 ): Promise<T> => {
   const key = createKey("PUT", url, body);
-  
+
   try {
     // PUT cần debounce để tránh double submit
     return await debounceApiCall<T>(
@@ -223,7 +223,7 @@ export const putDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
  * @param url - API endpoint
  * @param body - FormData object
  * @returns Promise với dữ liệu kiểu T hoặc Error
- * 
+ *
  * @example
  * const formData = new FormData();
  * formData.append('file', file);
@@ -276,7 +276,7 @@ export const putFormDataApi = async <T = unknown>(
  * @param url - API endpoint
  * @param body - Optional request body (for bulk delete)
  * @returns Promise với dữ liệu kiểu T
- * 
+ *
  * @example
  * await deleteDataApi<{ success: boolean }>('books/123');
  * await deleteDataApi<{ deleted: number }>('books/bulk', { ids: ['1', '2'] });
@@ -286,7 +286,7 @@ export const deleteDataApi = async <T = unknown>(
   body: ApiBody = {}
 ): Promise<T> => {
   const key = createKey("DELETE", url, body);
-  
+
   try {
     // DELETE cần debounce để tránh double delete
     return await debounceApiCall<T>(
@@ -312,7 +312,7 @@ export const deleteDataApi = async <T = unknown>(
  * @param url - API endpoint
  * @param body - Request body data (partial update)
  * @returns Promise với dữ liệu kiểu T
- * 
+ *
  * @example
  * const updated = await patchDataApi<IBook, Partial<IBook>>('books/123', { price: 100 });
  */
@@ -321,7 +321,7 @@ export const patchDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
   body: D
 ): Promise<T> => {
   const key = createKey("PATCH", url, body);
-  
+
   try {
     return await debounceApiCall<T>(
       key,

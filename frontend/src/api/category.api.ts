@@ -64,12 +64,18 @@ export const categoryApi = {
     try {
       const response = await getDataApi<GetCategoriesResponse>("categories", params);
       
+      // Kiểm tra response tồn tại
+      if (!response) {
+        console.warn("⚠️ Empty response from getAll categories");
+        return [];
+      }
+      
       // Xử lý response có thể có nhiều format khác nhau
       if (Array.isArray(response)) {
         return response as unknown as ICategory[];
       }
       
-      if (response.data && Array.isArray(response.data)) {
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
         return response.data;
       }
       
@@ -77,7 +83,8 @@ export const categoryApi = {
       return [];
     } catch (error) {
       console.error("❌ Error fetching categories:", error);
-      throw error;
+      // Return empty array thay vì throw để không crash UI
+      return [];
     }
   },
 
@@ -93,7 +100,11 @@ export const categoryApi = {
     try {
       const response = await getDataApi<GetCategoryResponse>(`categories/${id}`);
       
-      if (response.data) {
+      if (!response) {
+        throw new Error(`No response from server when fetching category ${id}`);
+      }
+      
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
         return response.data;
       }
       
@@ -124,7 +135,11 @@ export const categoryApi = {
         data
       );
       
-      if (response.data) {
+      if (!response) {
+        throw new Error('No response from server when creating category');
+      }
+      
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
         console.log("✅ Category created successfully:", response.data);
         return response.data;
       }
@@ -156,7 +171,11 @@ export const categoryApi = {
         data
       );
       
-      if (response.data) {
+      if (!response) {
+        throw new Error(`No response from server when updating category ${id}`);
+      }
+      
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
         console.log("✅ Category updated successfully:", response.data);
         return response.data;
       }
