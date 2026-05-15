@@ -1,6 +1,6 @@
 import axiosClient from "./axiosClient";
 import _ from "lodash";
-import type { ApiParams, ApiBody, DebounceCacheMap } from "@/types/api.types";
+import type { ApiParams, ApiBody } from "@/types/api.types";
 
 // ============================================
 // Types & Interfaces
