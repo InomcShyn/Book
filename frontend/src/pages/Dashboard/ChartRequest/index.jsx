@@ -10,6 +10,7 @@ import { API_REQUEST } from "@/configs/paths/API_PATH";
 import { getDataApi } from "@/api";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
+import { toast } from "react-toastify";
 import SearchFormBasic from "./component/SearchFormBasic";
 
 function ChartRequest() {

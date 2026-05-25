@@ -6,7 +6,6 @@ import type {
   UpdateBookDto,
   BookSearchParams,
   ApiResponse,
-  PaginationResponse,
   ObjectId,
 } from "@/types/api.types";
 
@@ -69,12 +68,6 @@ export const bookApi = {
     try {
       const response = await getDataApi<GetBooksResponse>("books", params);
       
-      // Kiểm tra response tồn tại
-      if (!response) {
-        console.warn("⚠️ Empty response from getAll books");
-        return [];
-      }
-      
       // Xử lý response có thể có nhiều format khác nhau
       if (Array.isArray(response)) {
         return response as unknown as IBook[];
@@ -84,7 +77,11 @@ export const bookApi = {
         return response.data;
       }
       
-      console.warn("⚠️ Unexpected response format from getAll books:", response);
+      // Chỉ log nếu response không phải null/undefined
+      if (response) {
+        console.warn("⚠️ Unexpected response format from getAll books:", response);
+      }
+      
       return [];
     } catch (error) {
       console.error("❌ Error fetching books:", error);
@@ -112,11 +109,17 @@ export const bookApi = {
         throw new Error(`No response from server when fetching book ${id}`);
       }
       
+      // Check if response has .data property (wrapped response)
       if (response && typeof response === 'object' && 'data' in response && response.data) {
         return response.data;
       }
       
-      // Fallback nếu response trực tiếp là data
+      // Check if response has _id (direct object from backend)
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as IBook;
+      }
+      
+      // Fallback
       return response as unknown as IBook;
     } catch (error) {
       console.error(`❌ Error fetching book ${id}:`, error);
@@ -149,12 +152,17 @@ export const bookApi = {
         throw new Error('No response from server when creating book');
       }
       
+      // Check if response has .data property (wrapped response)
       if (response && typeof response === 'object' && 'data' in response && response.data) {
-        console.log("✅ Book created successfully:", response.data);
         return response.data;
       }
       
-      // Fallback nếu response trực tiếp là data
+      // Check if response has _id (direct object from backend)
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as IBook;
+      }
+      
+      // Fallback
       return response as unknown as IBook;
     } catch (error) {
       console.error("❌ Error creating book:", error);
@@ -185,12 +193,17 @@ export const bookApi = {
         throw new Error(`No response from server when updating book ${id}`);
       }
       
+      // Check if response has .data property (wrapped response)
       if (response && typeof response === 'object' && 'data' in response && response.data) {
-        console.log("✅ Book updated successfully:", response.data);
         return response.data;
       }
       
-      // Fallback nếu response trực tiếp là data
+      // Check if response has _id (direct object from backend)
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as IBook;
+      }
+      
+      // Fallback
       return response as unknown as IBook;
     } catch (error) {
       console.error(`❌ Error updating book ${id}:`, error);
@@ -212,7 +225,6 @@ export const bookApi = {
   delete: async (id: ObjectId): Promise<DeleteBookResponse> => {
     try {
       const response = await deleteDataApi<DeleteBookResponse>(`books/${id}`);
-      console.log("✅ Book deleted successfully:", id);
       return response;
     } catch (error) {
       console.error(`❌ Error deleting book ${id}:`, error);

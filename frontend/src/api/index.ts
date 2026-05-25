@@ -118,7 +118,8 @@ export const getDataApi = async <T = unknown>(
     // GET requests không cần debounce mạnh, chỉ cần prevent duplicate
     return await debounceApiCall<T>(
       key,
-      () => axiosClient.get<T>(url, { params }).then(res => res.data as T),
+      // ✅ axiosClient interceptor already returns unwrapped data
+      () => axiosClient.get<T>(url, { params }).then(res => res as T),
       false
     );
   } catch (error) {
@@ -145,6 +146,7 @@ export const exportBlobApi = async (
   try {
     return await debounceApiCall<Blob>(
       key,
+      // ✅ For blob, we still need res.data because blob is not unwrapped
       () => axiosClient.get<Blob>(url, {
         params,
         responseType: "blob",
@@ -176,13 +178,28 @@ export const postDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
 
   try {
     // POST cần debounce để tránh double submit
-    return await debounceApiCall<T>(
+    const result = await debounceApiCall<T>(
       key,
-      () => axiosClient.post<T>(url, body).then(res => res.data as T),
+      () => {
+        // ✅ axiosClient already returns unwrapped data via interceptor
+        // So we return it directly, NOT res.data
+        return axiosClient.post<T>(url, body).then(res => {
+          // ✅ res is already the unwrapped data from interceptor
+          return res as T;
+        });
+      },
       true
     );
+    
+    return result;
   } catch (error) {
     console.error(`❌ POST api: ${url} error:`, error);
+    console.error(`❌ Error details:`, {
+      message: error.message,
+      response: error.response,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
     throw error;
   }
 };
@@ -208,7 +225,8 @@ export const putDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
     // PUT cần debounce để tránh double submit
     return await debounceApiCall<T>(
       key,
-      () => axiosClient.put<T>(url, body).then(res => res.data as T),
+      // ✅ axiosClient interceptor already returns unwrapped data
+      () => axiosClient.put<T>(url, body).then(res => res as T),
       true
     );
   } catch (error) {
@@ -239,7 +257,8 @@ export const postFormDataApi = async <T = unknown>(
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data as T;
+    // ✅ axiosClient interceptor already returns unwrapped data
+    return response as T;
   } catch (error) {
     console.error(`❌ POST form api: ${url} error:`, error);
     return error as Error;
@@ -263,7 +282,8 @@ export const putFormDataApi = async <T = unknown>(
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data as T;
+    // ✅ axiosClient interceptor already returns unwrapped data
+    return response as T;
   } catch (error) {
     console.error(`❌ PUT form api: ${url} error:`, error);
     return error as Error;
@@ -293,9 +313,10 @@ export const deleteDataApi = async <T = unknown>(
       key,
       () => {
         const isEmpty = Object.keys(body).length === 0;
+        // ✅ axiosClient interceptor already returns unwrapped data
         return isEmpty
-          ? axiosClient.delete<T>(url).then(res => res.data as T)
-          : axiosClient.delete<T>(url, { data: body }).then(res => res.data as T);
+          ? axiosClient.delete<T>(url).then(res => res as T)
+          : axiosClient.delete<T>(url, { data: body }).then(res => res as T);
       },
       true
     );
@@ -325,7 +346,8 @@ export const patchDataApi = async <T = unknown, D extends ApiBody = ApiBody>(
   try {
     return await debounceApiCall<T>(
       key,
-      () => axiosClient.patch<T>(url, body).then(res => res.data as T),
+      // ✅ axiosClient interceptor already returns unwrapped data
+      () => axiosClient.patch<T>(url, body).then(res => res as T),
       true
     );
   } catch (error) {

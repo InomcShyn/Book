@@ -64,12 +64,6 @@ export const categoryApi = {
     try {
       const response = await getDataApi<GetCategoriesResponse>("categories", params);
       
-      // Kiểm tra response tồn tại
-      if (!response) {
-        console.warn("⚠️ Empty response from getAll categories");
-        return [];
-      }
-      
       // Xử lý response có thể có nhiều format khác nhau
       if (Array.isArray(response)) {
         return response as unknown as ICategory[];
@@ -79,7 +73,11 @@ export const categoryApi = {
         return response.data;
       }
       
-      console.warn("⚠️ Unexpected response format from getAll categories:", response);
+      // Chỉ log nếu response không phải null/undefined
+      if (response) {
+        console.warn("⚠️ Unexpected response format from getAll categories:", response);
+      }
+      
       return [];
     } catch (error) {
       console.error("❌ Error fetching categories:", error);
@@ -104,11 +102,17 @@ export const categoryApi = {
         throw new Error(`No response from server when fetching category ${id}`);
       }
       
+      // Check if response has .data property (wrapped response)
       if (response && typeof response === 'object' && 'data' in response && response.data) {
         return response.data;
       }
       
-      // Fallback nếu response trực tiếp là data
+      // Check if response has _id (direct object from backend)
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as ICategory;
+      }
+      
+      // Fallback
       return response as unknown as ICategory;
     } catch (error) {
       console.error(`❌ Error fetching category ${id}:`, error);
@@ -130,6 +134,7 @@ export const categoryApi = {
    */
   create: async (data: CreateCategoryDto): Promise<ICategory> => {
     try {
+      
       const response = await postDataApi<CategoryMutationResponse, CreateCategoryDto>(
         "categories",
         data
@@ -139,12 +144,17 @@ export const categoryApi = {
         throw new Error('No response from server when creating category');
       }
       
+      // Check if response has .data property (wrapped response)
       if (response && typeof response === 'object' && 'data' in response && response.data) {
-        console.log("✅ Category created successfully:", response.data);
         return response.data;
       }
       
-      // Fallback nếu response trực tiếp là data
+      // Check if response has _id (direct object from backend)
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as ICategory;
+      }
+      
+      // Fallback
       return response as unknown as ICategory;
     } catch (error) {
       console.error("❌ Error creating category:", error);
@@ -175,12 +185,17 @@ export const categoryApi = {
         throw new Error(`No response from server when updating category ${id}`);
       }
       
+      // Check if response has .data property (wrapped response)
       if (response && typeof response === 'object' && 'data' in response && response.data) {
-        console.log("✅ Category updated successfully:", response.data);
         return response.data;
       }
       
-      // Fallback nếu response trực tiếp là data
+      // Check if response has _id (direct object from backend)
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as ICategory;
+      }
+      
+      // Fallback
       return response as unknown as ICategory;
     } catch (error) {
       console.error(`❌ Error updating category ${id}:`, error);
@@ -202,7 +217,6 @@ export const categoryApi = {
   delete: async (id: ObjectId): Promise<DeleteCategoryResponse> => {
     try {
       const response = await deleteDataApi<DeleteCategoryResponse>(`categories/${id}`);
-      console.log("✅ Category deleted successfully:", id);
       return response;
     } catch (error) {
       console.error(`❌ Error deleting category ${id}:`, error);
